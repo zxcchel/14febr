@@ -177,12 +177,17 @@
 
     // Добавление звука кота, который будет воспроизводиться при нажатии на экран
     // Замените URL на ссылку к вашему звуковому файлу мяукотня котика, если необходимо.
-    const catSound = new Audio('odinochnyiy-pisk-kroshki.mp3');
-    document.addEventListener('click', () => {
-      // Если звук уже воспроизводится, перематываем его в начало
-      catSound.currentTime = 0;
-      catSound.play();
-    });
+// Создаём объект звука с указанным URL
+const catSound = new Audio('odinochnyiy-pisk-kroshki.mp3');
+// Устанавливаем громкость на 50%
+catSound.volume = 0.2;
+
+document.addEventListener('click', () => {
+  // Если звук уже воспроизводится, перематываем его в начало
+  catSound.currentTime = 0;
+  catSound.play();
+});
+
   </script>
 </body>
 </html>
