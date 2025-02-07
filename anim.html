@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>Сердце из частиц</title>
+  <title>Анимация сердца из частиц</title>
   <style>
     html, body {
       margin: 0;
@@ -24,21 +24,51 @@
     let particles = [];
     let centerX, centerY, scale;
 
-    // 1. Объявляем класс Particle до использования
+    // Время начала анимации (будет установлено при первом вызове animate)
+    let initialTime = null;
+    // Задержка перед началом сборки (в миллисекундах)
+    const gatherDelay = 2000;
+    // Длительность сборки частиц в форму сердца (в миллисекундах)
+    const gatherDuration = 3000;
+
+    // Класс частицы, которая имеет случайную начальную позицию и целевую позицию (на форме сердца)
     class Particle {
-      constructor(x, y) {
-        this.baseX = x;
-        this.baseY = y;
+      constructor(targetX, targetY) {
+        // Целевая позиция (на форме сердца)
+        this.tx = targetX;
+        this.ty = targetY;
+        // Начальная случайная позиция на canvas
+        this.sx = Math.random() * canvas.width;
+        this.sy = Math.random() * canvas.height;
+        // Параметры для пульсирующего эффекта (используются после завершения сборки)
         this.phase = Math.random() * 2 * Math.PI;
-        this.amplitude = Math.random() * 5 + 2; // амплитуда колебаний
-        this.radius = Math.random() * 1.5 + 0.5;  // радиус частицы
-        this.speed = Math.random() * 0.5 + 0.5;   // скорость колебания
+        this.amplitude = Math.random() * 5 + 2;
+        this.speed = Math.random() * 0.5 + 0.5;
+        this.radius = Math.random() * 1.5 + 0.5;
+        // Изначально частица находится в стартовой позиции
+        this.x = this.sx;
+        this.y = this.sy;
+        this.alpha = 0;
       }
       
-      update(t) {
-        this.x = this.baseX + this.amplitude * Math.sin(t * this.speed + this.phase);
-        this.y = this.baseY + this.amplitude * Math.cos(t * this.speed + this.phase);
-        this.alpha = 0.5 + 0.5 * Math.sin(t * this.speed + this.phase);
+      /**
+       * Обновление позиции частицы.
+       * @param {number} oscTime — время, масштабированное для осцилляции (используется после сборки).
+       * @param {number} progress — прогресс сборки (от 0 до 1).
+       */
+      update(oscTime, progress) {
+        if (progress < 1) {
+          // Фаза сборки: линейная интерполяция от стартовой позиции к целевой.
+          this.x = this.sx + (this.tx - this.sx) * progress;
+          this.y = this.sy + (this.ty - this.sy) * progress;
+          // Добавляем эффект появления (fade-in)
+          this.alpha = progress;
+        } else {
+          // После сборки — пульсация вокруг целевой позиции.
+          this.x = this.tx + this.amplitude * Math.sin(oscTime * this.speed + this.phase);
+          this.y = this.ty + this.amplitude * Math.cos(oscTime * this.speed + this.phase);
+          this.alpha = 0.5 + 0.5 * Math.sin(oscTime * this.speed + this.phase);
+        }
       }
       
       draw(ctx) {
@@ -49,29 +79,28 @@
       }
     }
 
-    // 2. Функция инициализации частиц
-    function initParticles() {
-      particles = [];
-      const step = 0.05;  // шаг по сетке (чем меньше значение, тем плотнее частицы)
-      // Используем неявное уравнение сердца: (x²+y²–1)³ – x²·y³ <= 0
-      for (let x = -1; x <= 1; x += step) {
-        for (let y = -1.5; y <= 1; y += step) {
-          let f = Math.pow(x * x + y * y - 1, 3) - x * x * Math.pow(y, 3);
-          if (f <= 0) {
-            // Переводим нормированные координаты в координаты canvas
-            let px = centerX + x * scale;
-            let py = centerY - y * scale; // инвертируем y, так как ось y в canvas направлена вниз
-            // Небольшой случайный сдвиг для "натурального" вида
-            px += (Math.random() - 0.5) * 2;
-            py += (Math.random() - 0.5) * 2;
-            particles.push(new Particle(px, py));
-          }
-        }
+    /**
+     * Инициализация частиц по форме сердца.
+     * Используется неявное уравнение сердца: (x²+y²-1)³ - x²·y³ <= 0.
+     * Здесь нормированные координаты x от -1 до 1 и y от -1.5 до 1.
+     * Если форма кажется не совсем сердечной, можно поиграться с диапазоном y или коэффициентом масштабирования.
+     */
+function initParticles() {
+  particles = [];
+  const step = 0.03; // уменьшаем шаг для более плавного контура
+  for (let y = 1.3; y >= -1.1; y -= step) {
+    for (let x = -1.2; x <= 1.2; x += step) {
+      let f = Math.pow(x * x + y * y - 1, 3) - x * x * Math.pow(y, 3);
+      if (f <= 0) {
+        let px = centerX + x * scale;
+        let py = centerY - y * scale;
+        particles.push(new Particle(px, py));
       }
-      console.log("Частиц создано:", particles.length);
     }
+  }
+}
 
-    // 3. Функция для установки размеров canvas и пересчёта параметров
+
     function resize() {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
@@ -81,20 +110,28 @@
       initParticles();
     }
     window.addEventListener('resize', resize);
-    resize(); // Вызовем resize после определения класса и функций
+    resize();
 
-    // 4. Функция анимации
     function animate(time) {
-      let t = time * 0.002;
-      // Рисуем полупрозрачный черный прямоугольник для эффекта затухающих следов
+      if (!initialTime) initialTime = time;
+      const elapsed = time - initialTime;
+      // Определяем прогресс сборки: до gatherDelay частицы остаются на случайных местах.
+      let progress = 0;
+      if (elapsed > gatherDelay) {
+        progress = Math.min((elapsed - gatherDelay) / gatherDuration, 1);
+      }
+      // Для осцилляции масштабируем время (как в предыдущем варианте)
+      const oscTime = elapsed * 0.002;
+      
+      // Заливаем фон полупрозрачным чёрным для эффекта следов.
       ctx.fillStyle = "rgba(0, 0, 0, 0.15)";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       
-      // Используем режим наложения для эффекта свечения
+      // Режим наложения для эффекта свечения.
       ctx.globalCompositeOperation = "lighter";
       
       for (let particle of particles) {
-        particle.update(t);
+        particle.update(oscTime, progress);
         particle.draw(ctx);
       }
       
