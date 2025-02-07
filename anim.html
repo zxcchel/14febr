@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Heart Animation</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+    </style>
+</head>
+<body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        let scene, camera, renderer, particles, particleMaterial;
+
+        function init() {
+            // Создаем сцену
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+
+            // Материал частиц
+            particleMaterial = new THREE.PointsMaterial({
+                color: 0xff0000, // красный цвет
+                size: 0.1
+            });
+
+            // Массив частиц
+            particles = new THREE.Geometry();
+
+            // Генерируем частицы для сердца
+            for (let i = 0; i < 5000; i++) {
+                let x = Math.random() * 10 - 5;
+                let y = Math.random() * 10 - 5;
+                let z = Math.random() * 10 - 5;
+                let distance = Math.sqrt(x * x + y * y + z * z);
+
+                // Формируем частицы по форме сердца
+                if (Math.pow(x, 2) + Math.pow(y, 2) - (Math.pow(z, 2) - 1) < 1) {
+                    particles.vertices.push(new THREE.Vector3(x, y, z));
+                }
+            }
+
+            // Создаем объект для частиц
+            const particleSystem = new THREE.Points(particles, particleMaterial);
+            scene.add(particleSystem);
+
+            camera.position.z = 30;
+
+            animate();
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Вращаем частицы для красивой анимации
+            scene.rotation.x += 0.001;
+            scene.rotation.y += 0.001;
+
+            renderer.render(scene, camera);
+        }
+
+        init();
+    </script>
+</body>
+</html>
