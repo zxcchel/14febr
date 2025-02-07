@@ -2,13 +2,14 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>Ого, это что такое</title>
+  <title>Ого, это что такое?</title>
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Sansita+Swashed:wght@700&display=swap');
     html, body {
       margin: 0;
       padding: 0;
       overflow: hidden;
-      background: #000;
+      background: #fff;
     }
     canvas {
       display: block;
@@ -22,85 +23,107 @@
     const ctx = canvas.getContext('2d');
 
     let particles = [];
+    // Удалён массив для лепестков
     let centerX, centerY, scale;
+    const gatherDelay = 0;       // задержка перед началом анимации (0 для отладки)
+    const gatherDuration = 3000; // длительность анимации приближения частиц
+    let textVisible = false;
 
-    // Время начала анимации (будет установлено при первом вызове animate)
-    let initialTime = null;
-    // Задержка перед началом сборки (в миллисекундах)
-    const gatherDelay = 2000;
-    // Длительность сборки частиц в форму сердца (в миллисекундах)
-    const gatherDuration = 3000;
+    // Ритмичная пульсация сердца (период 2000 мс)
+    function heartBeatScale(time) {
+      const period = 2000;
+      const x = (time % period) / period;
+      let scaleFactor = 1;
+      if (x < 0.1) {
+        scaleFactor += 0.15 * Math.sin(Math.PI * (x / 0.1));
+      } else if (x < 0.2) {
+        scaleFactor += 0.15 * Math.sin(Math.PI * ((0.2 - x) / 0.1));
+      } else if (x < 0.3) {
+        scaleFactor += 0.07 * Math.sin(Math.PI * ((x - 0.2) / 0.1));
+      } else if (x < 0.4) {
+        scaleFactor += 0.07 * Math.sin(Math.PI * ((0.4 - x) / 0.1));
+      }
+      return scaleFactor;
+    }
 
-    // Класс частицы, которая имеет случайную начальную позицию и целевую позицию (на форме сердца)
+    // Класс частицы сердца
     class Particle {
-      constructor(targetX, targetY) {
-        // Целевая позиция (на форме сердца)
+      constructor(targetX, targetY, isEdge = false, spawnTime = performance.now()) {
         this.tx = targetX;
         this.ty = targetY;
-        // Начальная случайная позиция на canvas
+        this.isEdge = isEdge;      // true, если частица находится на краю сердца
+        this.spawnTime = spawnTime;
+        // Начальные координаты выбираются случайно по размеру canvas
         this.sx = Math.random() * canvas.width;
         this.sy = Math.random() * canvas.height;
-        // Параметры для пульсирующего эффекта (используются после завершения сборки)
         this.phase = Math.random() * 2 * Math.PI;
         this.amplitude = Math.random() * 5 + 2;
         this.speed = Math.random() * 0.5 + 0.5;
-        this.radius = Math.random() * 1.5 + 0.5;
-        // Изначально частица находится в стартовой позиции
+        this.radius = Math.random() * 2 + 1;
         this.x = this.sx;
         this.y = this.sy;
         this.alpha = 0;
+        this.shed = false; // Флаг, указывающий, что частица "отпала" и должна быть заменена
       }
-      
-      /**
-       * Обновление позиции частицы.
-       * @param {number} oscTime — время, масштабированное для осцилляции (используется после сборки).
-       * @param {number} progress — прогресс сборки (от 0 до 1).
-       */
-      update(oscTime, progress) {
-        if (progress < 1) {
-          // Фаза сборки: линейная интерполяция от стартовой позиции к целевой.
-          this.x = this.sx + (this.tx - this.sx) * progress;
-          this.y = this.sy + (this.ty - this.sy) * progress;
-          // Добавляем эффект появления (fade-in)
-          this.alpha = progress;
+      update(oscTime, currentTime) {
+        const localElapsed = currentTime - this.spawnTime;
+    let progress = 0;
+    if (localElapsed > gatherDelay) {
+        progress = Math.min((localElapsed - gatherDelay) / gatherDuration, 1);
+    }
+    if (progress < 1) {
+        // Частицы в процессе полета — они размыты и менее заметны
+        this.x = this.sx + (this.tx - this.sx) * progress;
+        this.y = this.sy + (this.ty - this.sy) * progress;
+        this.alpha = progress * 0.5; // Прозрачнее
+        this.radius = (Math.random() * 2 + 1) * (0.5 + progress * 0.5); // Меньше при старте
         } else {
-          // После сборки — пульсация вокруг целевой позиции.
-          this.x = this.tx + this.amplitude * Math.sin(oscTime * this.speed + this.phase);
-          this.y = this.ty + this.amplitude * Math.cos(oscTime * this.speed + this.phase);
-          this.alpha = 0.5 + 0.5 * Math.sin(oscTime * this.speed + this.phase);
+          // После достижения цели применяется ритмичная пульсация
+          const pulse = heartBeatScale(currentTime);
+          this.x = centerX + (this.tx - centerX) * pulse + this.amplitude * Math.sin(oscTime * this.speed + this.phase) * 0.5;
+          this.y = centerY + (this.ty - centerY) * pulse + this.amplitude * Math.cos(oscTime * this.speed + this.phase) * 0.5;
+          this.alpha = 0.8;
+          textVisible = true;
+          // Если частица находится на краю и полностью пришла на место, с небольшой вероятностью заменяем её новой частицей
+          if (this.isEdge && !this.shed && Math.random() < 0.002) {
+            this.shed = true;
+            particles.push(new Particle(this.tx, this.ty, this.isEdge, currentTime));
+          }
         }
       }
-      
       draw(ctx) {
         ctx.beginPath();
         ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(255,105,180, ${this.alpha})`;
+        ctx.fillStyle = `rgba(255,0,100,${this.alpha})`;
         ctx.fill();
       }
     }
 
-    /**
-     * Инициализация частиц по форме сердца.
-     * Используется неявное уравнение сердца: (x²+y²-1)³ - x²·y³ <= 0.
-     * Здесь нормированные координаты x от -1 до 1 и y от -1.5 до 1.
-     * Если форма кажется не совсем сердечной, можно поиграться с диапазоном y или коэффициентом масштабирования.
-     */
-function initParticles() {
-  particles = [];
-  const step = 0.03; // уменьшаем шаг для более плавного контура
-  for (let y = 1.3; y >= -1.1; y -= step) {
-    for (let x = -1.2; x <= 1.2; x += step) {
-      let f = Math.pow(x * x + y * y - 1, 3) - x * x * Math.pow(y, 3);
-      if (f <= 0) {
-        let px = centerX + x * scale;
-        let py = centerY - y * scale;
-        particles.push(new Particle(px, py));
+    // Создание частиц по контуру сердца с повышенной плотностью по краям
+    function initParticles() {
+      particles = [];
+      const step = 0.05;
+      // Перебираем координаты, удовлетворяющие уравнению сердца: (x²+y²-1)³ - x²·y³ = 0
+      for (let y = 1.3; y >= -1.1; y -= step) {
+        for (let x = -1.2; x <= 1.2; x += step) {
+          let f = Math.pow(x * x + y * y - 1, 3) - x * x * Math.pow(y, 3);
+          if (f <= 0) {
+            let px = centerX + x * scale;
+            let py = centerY - y * scale;
+            // Если f > -0.2, считаем, что точка находится ближе к краю
+            let isEdge = (f > -0.2);
+            particles.push(new Particle(px, py, isEdge));
+            // В точках, где f > -0.1 (ещё ближе к границе), добавляем дополнительную частицу
+            if (f > -0.1) {
+              particles.push(new Particle(px, py, true));
+            }
+          }
+        }
       }
+      console.log("Частиц создано:", particles.length);
     }
-  }
-}
 
-
+    // Установка размеров canvas и вычисление центра
     function resize() {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
@@ -113,32 +136,44 @@ function initParticles() {
     resize();
 
     function animate(time) {
-      if (!initialTime) initialTime = time;
-      const elapsed = time - initialTime;
-      // Определяем прогресс сборки: до gatherDelay частицы остаются на случайных местах.
-      let progress = 0;
-      if (elapsed > gatherDelay) {
-        progress = Math.min((elapsed - gatherDelay) / gatherDuration, 1);
-      }
-      // Для осцилляции масштабируем время (как в предыдущем варианте)
-      const oscTime = elapsed * 0.002;
-      
-      // Заливаем фон полупрозрачным чёрным для эффекта следов.
-      ctx.fillStyle = "rgba(0, 0, 0, 0.15)";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      
-      // Режим наложения для эффекта свечения.
-      ctx.globalCompositeOperation = "lighter";
-      
+      const oscTime = time * 0.002;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Обновляем и рисуем частицы сердца
       for (let particle of particles) {
-        particle.update(oscTime, progress);
+        particle.update(oscTime, time);
         particle.draw(ctx);
       }
-      
-      ctx.globalCompositeOperation = "source-over";
+      // Удаляем частицы, которые были заменены (помеченные shed)
+      particles = particles.filter(p => !p.shed);
+
+      // Рисуем текст поверх всего
+      if (textVisible) {
+        ctx.textAlign = "center";
+        ctx.fillStyle = `rgba(0,0,0,${0.7 + 0.3 * Math.sin(oscTime)})`;
+        ctx.font = "40px 'Sansita Swashed', cursive";
+        ctx.fillText("Люблю тебя", centerX, 100);
+        ctx.fillText("МЯУ", centerX, 150);
+
+        ctx.font = "28px sans-serif";
+        ctx.fillText(getCountdownText(), centerX, canvas.height - 60);
+      }
       requestAnimationFrame(animate);
     }
-    
+
+    // Функция обратного отсчёта до 14 февраля
+    function getCountdownText() {
+      const now = new Date();
+      let targetDate = new Date(now.getFullYear(), 1, 14);
+      if (now > targetDate) targetDate.setFullYear(targetDate.getFullYear() + 1);
+      const diff = targetDate - now;
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+      const minutes = Math.floor((diff / (1000 * 60)) % 60);
+      const seconds = Math.floor((diff / 1000) % 60);
+      return `До 14 февраля: ${days} дн ${hours} ч ${minutes} мин ${seconds} сек`;
+    }
+
     requestAnimationFrame(animate);
   </script>
 </body>
