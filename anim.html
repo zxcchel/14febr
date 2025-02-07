@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>Ого, это что такое?</title>
+  <title>Анимация сердца из частиц (единый слой)</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Sansita+Swashed:wght@700&display=swap');
     html, body {
@@ -23,7 +23,6 @@
     const ctx = canvas.getContext('2d');
 
     let particles = [];
-    // Удалён массив для лепестков
     let centerX, centerY, scale;
     const gatherDelay = 0;       // задержка перед началом анимации (0 для отладки)
     const gatherDuration = 3000; // длительность анимации приближения частиц
@@ -67,16 +66,16 @@
       }
       update(oscTime, currentTime) {
         const localElapsed = currentTime - this.spawnTime;
-    let progress = 0;
-    if (localElapsed > gatherDelay) {
-        progress = Math.min((localElapsed - gatherDelay) / gatherDuration, 1);
-    }
-    if (progress < 1) {
-        // Частицы в процессе полета — они размыты и менее заметны
-        this.x = this.sx + (this.tx - this.sx) * progress;
-        this.y = this.sy + (this.ty - this.sy) * progress;
-        this.alpha = progress * 0.5; // Прозрачнее
-        this.radius = (Math.random() * 2 + 1) * (0.5 + progress * 0.5); // Меньше при старте
+        let progress = 0;
+        if (localElapsed > gatherDelay) {
+          progress = Math.min((localElapsed - gatherDelay) / gatherDuration, 1);
+        }
+        if (progress < 1) {
+          // Частицы в процессе полета — они размыты и менее заметны
+          this.x = this.sx + (this.tx - this.sx) * progress;
+          this.y = this.sy + (this.ty - this.sy) * progress;
+          this.alpha = progress * 0.5;
+          this.radius = (Math.random() * 2 + 1) * (0.5 + progress * 0.5);
         } else {
           // После достижения цели применяется ритмичная пульсация
           const pulse = heartBeatScale(currentTime);
@@ -129,7 +128,7 @@
       canvas.height = window.innerHeight;
       centerX = canvas.width / 2;
       centerY = canvas.height / 2;
-      scale = Math.min(canvas.width, canvas.height) / 3;
+      scale = Math.min(canvas.width, canvas.height) / 4;
       initParticles();
     }
     window.addEventListener('resize', resize);
@@ -175,6 +174,15 @@
     }
 
     requestAnimationFrame(animate);
+
+    // Добавление звука кота, который будет воспроизводиться при нажатии на экран
+    // Замените URL на ссылку к вашему звуковому файлу мяукотня котика, если необходимо.
+    const catSound = new Audio('odinochnyiy-pisk-kroshki.mp3');
+    document.addEventListener('click', () => {
+      // Если звук уже воспроизводится, перематываем его в начало
+      catSound.currentTime = 0;
+      catSound.play();
+    });
   </script>
 </body>
 </html>
